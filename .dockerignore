@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+**/__pycache__/
+jobs/
+output/
+scratch_probe/
+*.stp
+*.step
+.git/
+db_config.json

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STEP Feature Extractor</title>
+<style>
+:root{--bg:#f5f5f2;--card:#fff;--ink:#1c1c1a;--muted:#6a6a64;--line:#e3e3dd;--accent:#e8660c;--accent-soft:#fff1e6;--ok:#1f7a4a;--err:#b42318}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:22px;margin:0}
+.sub{color:var(--muted);margin:4px 0 22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+label.k{font-weight:600;font-size:13px}
+input[type=password],input[type=text],select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+#key{flex:1;min-width:220px}
+button,.btn{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+#drop{border:2px dashed #cfcfc6;border-radius:12px;padding:34px 20px;text-align:center;cursor:pointer;transition:.15s}
+#drop.over{border-color:var(--accent);background:var(--accent-soft)}
+#drop b{font-size:16px}
+#drop .muted{margin-top:6px}
+.muted{color:var(--muted);font-size:13px}
+#status{margin-top:14px;display:none}
+.bar{height:8px;background:#ececE6;border-radius:6px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.bar.busy i{width:30%;animation:slide 1.2s infinite ease-in-out}
+@keyframes slide{0%{margin-left:-30%}100%{margin-left:100%}}
+.err{color:var(--err);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .l{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.warn{background:#fff8e1;border:1px solid #f3dc8c;border-radius:8px;padding:8px 12px;margin-top:10px;font-size:13px}
+h2{font-size:16px;margin:0 0 12px}
+.downloads{display:flex;gap:8px;flex-wrap:wrap}
+iframe{width:100%;height:78vh;border:1px solid var(--line);border-radius:10px;background:#fff}
+.tablewrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 10px;border-bottom:1px solid #efefea;text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:#fafaf7;font-weight:600;z-index:1}
+td.c{white-space:normal;min-width:280px}
+td.n{font-variant-numeric:tabular-nums;text-align:right}
+.tag{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.pat{list-style:none;margin:0;padding:0;columns:2;column-gap:28px}
+.pat li{break-inside:avoid;padding:3px 0;border-bottom:1px dashed #ecece6}
+.pat b{color:var(--accent);margin-right:6px}
+#recent li{margin:4px 0}
+#recent a{color:var(--accent);cursor:pointer}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+@media (max-width:700px){.pat{columns:1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>STEP Feature Extractor</h1>
+  <p class="sub">Upload a 3D model (.stp / .step) to get every machining feature (holes, pockets, slots, chamfers, fillets and more) with sizes and positions.</p>
+
+  <div class="card">
+    <div class="row">
+      <label class="k" for="key">API key</label>
+      <input type="password" id="key" placeholder="X-API-Key" autocomplete="off">
+      <button id="showKey" type="button">Show</button>
+    </div>
+    <div class="muted" style="margin-top:6px">Kept in this browser only, so you don't have to type it again.</div>
+  </div>
+
+  <div class="card">
+    <div id="drop" tabindex="0">
+      <b>Drop a STEP file here</b>
+      <div class="muted">or click to choose · .stp / .step</div>
+      <input type="file" id="file" accept=".stp,.step" hidden>
+    </div>
+    <div id="status">
+      <div id="statusText"></div>
+      <div class="bar" id="bar"><i></i></div>
+    </div>
+  </div>
+
+  <div id="results" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2 id="partName" style="margin:0"></h2>
+        <div class="downloads">
+          <button data-dl="feature_table.csv">⬇ Feature table (CSV)</button>
+          <button data-dl="feature_table.txt">⬇ Feature table (TXT)</button>
+          <button data-dl="features.json">⬇ Full result (JSON)</button>
+          <button data-dl="viewer.html">⬇ 3D viewer (HTML)</button>
+        </div>
+      </div>
+      <div class="grid" id="stats" style="margin-top:14px"></div>
+      <div id="warnings"></div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="on" data-tab="viewer">3D viewer</button>
+        <button data-tab="table">Feature table</button>
+        <button data-tab="patterns">Patterns</button>
+      </div>
+      <div data-pane="viewer"><iframe id="viewer" title="3D viewer"></iframe></div>
+      <div data-pane="table" hidden>
+        <div class="row" style="margin-bottom:10px">
+          <input type="text" id="q" placeholder="Search, e.g. Ø6.8 or pocket" style="flex:1;min-width:200px">
+          <select id="typeFilter"><option value="">All types</option></select>
+        </div>
+        <div class="tablewrap"><table id="tbl"><thead><tr>
+          <th>ID</th><th>Pattern</th><th>Type</th><th>Callout</th><th>X</th><th>Y</th><th>Z</th><th>Direction</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="muted" style="margin-top:6px">X / Y / Z are measured from the part's bounding-box minimum corner (mm).</div>
+      </div>
+      <div data-pane="patterns" hidden><ul class="pat" id="patterns"></ul></div>
+    </div>
+  </div>
+
+  <div class="card" id="recentCard" hidden>
+    <h2>Recent uploads</h2>
+    <ul id="recent" style="margin:0;padding-left:18px"></ul>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+const keyEl = $('#key');
+keyEl.value = store.get('apiKey', '');
+keyEl.oninput = () => store.set('apiKey', keyEl.value.trim());
+$('#showKey').onclick = () => { const t = keyEl.type === 'password'; keyEl.type = t ? 'text' : 'password'; $('#showKey').textContent = t ? 'Hide' : 'Show'; };
+
+let current = null;   // {job_id, part, features, patterns}
+const viewerCache = {};
+
+// ---------- upload ----------
+const drop = $('#drop'), fileEl = $('#file');
+drop.onclick = () => fileEl.click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') fileEl.click(); };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); };
+fileEl.onchange = () => { if (fileEl.files[0]) upload(fileEl.files[0]); fileEl.value = ''; };
+
+function status(html, mode) {
+  $('#status').style.display = 'block';
+  $('#statusText').innerHTML = html;
+  const bar = $('#bar');
+  bar.style.display = mode === 'none' ? 'none' : 'block';
+  bar.classList.toggle('busy', mode === 'busy');
+  if (typeof mode === 'number') bar.querySelector('i').style.width = mode + '%';
+  else bar.querySelector('i').style.width = '';
+}
+
+function upload(file) {
+  const key = keyEl.value.trim();
+  if (!key) { status('<span class="err">Enter the API key first.</span>', 'none'); keyEl.focus(); return; }
+  if (!/\.(stp|step)$/i.test(file.name)) { status('<span class="err">Please choose a .stp or .step file.</span>', 'none'); return; }
+  drop.style.pointerEvents = 'none';
+  const form = new FormData(); form.append('file', file);
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/extract');
+  xhr.setRequestHeader('X-API-Key', key);
+  let timer = null, t0 = 0;
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) status(`Uploading <b>${esc(file.name)}</b>… ${Math.round(100 * e.loaded / e.total)}%`, 100 * e.loaded / e.total);
+  };
+  xhr.upload.onload = () => {
+    t0 = Date.now();
+    const tick = () => status(`Analysing <b>${esc(file.name)}</b>… ${Math.round((Date.now() - t0) / 1000)} s<div class="muted">Large models can take a minute or more.</div>`, 'busy');
+    tick(); timer = setInterval(tick, 1000);
+  };
+  xhr.onload = () => {
+    clearInterval(timer); drop.style.pointerEvents = '';
+    let body = null; try { body = JSON.parse(xhr.responseText); } catch {}
+    if (xhr.status !== 200) {
+      const msg = xhr.status === 401 ? 'The API key was rejected.' : (body && body.detail) || `Server error (${xhr.status}).`;
+      status(`<span class="err">${esc(msg)}</span>`, 'none'); return;
+    }
+    const secs = t0 ? Math.round((Date.now() - t0) / 1000) : 0;
+    status(`<span style="color:var(--ok);font-weight:600">Done</span>: ${body.features.length} features found in ${secs} s.`, 'none');
+    remember(body.job_id, file.name);
+    show(body);
+  };
+  xhr.onerror = () => { clearInterval(timer); drop.style.pointerEvents = ''; status('<span class="err">Could not reach the server.</span>', 'none'); };
+  status(`Uploading <b>${esc(file.name)}</b>…`, 0);
+  xhr.send(form);
+}
+
+// ---------- results ----------
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function show(res) {
+  current = res;
+  $('#results').hidden = false;
+  const p = res.part;
+  $('#partName').textContent = p.file;
+  const counts = p.feature_counts || {};
+  const s = p.stock_size;
+  const tiles = [[`${s.x} × ${s.y} × ${s.z}`, 'Stock size (mm)'], [res.features.length, 'Features'], [p.face_count, 'Faces'], [res.patterns.length, 'Patterns']]
+    .concat(Object.entries(counts).map(([k, v]) => [v, k]));
+  $('#stats').innerHTML = tiles.map(([v, l]) => `<div class="stat"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join('');
+  const w = (p.warnings || []).map(x => `<div class="warn">⚠ ${esc(x)}</div>`).join('');
+  $('#warnings').innerHTML = w;
+
+  const tf = $('#typeFilter');
+  tf.innerHTML = '<option value="">All types</option>' + Object.entries(counts).map(([k, v]) => `<option value="${esc(k)}">${esc(k)} (${v})</option>`).join('');
+  renderTable();
+  $('#patterns').innerHTML = res.patterns.length
+    ? res.patterns.map(x => `<li><b>${esc(x.pattern_id)}</b>${esc(x.callout)}</li>`).join('')
+    : '<li class="muted">No repeated features.</li>';
+  loadViewer(res.job_id);
+  $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderTable() {
+  if (!current) return;
+  const q = $('#q').value.toLowerCase(), t = $('#typeFilter').value;
+  const rows = current.features.filter(f => (!t || f.type === t) && (!q || `${f.callout} ${f.subtype} ${f.pattern_id || ''}`.toLowerCase().includes(q)));
+  const fmt = v => v == null ? '' : Number(v).toFixed(2);
+  $('#tbl tbody').innerHTML = rows.map(f => {
+    const p = f.position_from_datum || [];
+    const dir = f.direction_name || f.open_direction || f.axis || f.depth_axis || f.normal || '';
+    return `<tr><td class="n">${f.id}</td><td>${esc(f.pattern_id || '')}</td><td class="tag">${esc(f.type)}</td><td class="c">${esc(f.callout)}</td>
+      <td class="n">${fmt(p[0])}</td><td class="n">${fmt(p[1])}</td><td class="n">${fmt(p[2])}</td><td>${esc(dir)}</td></tr>`;
+  }).join('');
+}
+$('#q').oninput = renderTable;
+$('#typeFilter').onchange = renderTable;
+
+document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== b.dataset.tab);
+});
+
+async function authedBlob(path) {
+  const r = await fetch(path, { headers: { 'X-API-Key': keyEl.value.trim() } });
+  if (!r.ok) throw new Error(r.status === 401 ? 'The API key was rejected.' : `Download failed (${r.status}).`);
+  return r.blob();
+}
+
+async function loadViewer(jobId) {
+  const frame = $('#viewer');
+  frame.removeAttribute('src');
+  try {
+    if (!viewerCache[jobId]) viewerCache[jobId] = URL.createObjectURL(await authedBlob(`/jobs/${jobId}/viewer.html`));
+    frame.src = viewerCache[jobId];
+  } catch (e) { frame.srcdoc = `<p style="font:14px system-ui;padding:20px;color:#b42318">${esc(e.message)}</p>`; }
+}
+
+document.querySelectorAll('[data-dl]').forEach(b => b.onclick = async () => {
+  if (!current) return;
+  const name = b.dataset.dl, stem = current.part.file.replace(/\.(stp|step)$/i, '').replace(/\s+/g, '_');
+  const label = b.textContent; b.disabled = true; b.textContent = 'Preparing…';
+  try {
+    const blob = await authedBlob(`/jobs/${current.job_id}/${name}`);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${stem}_${name.replace('feature_table', 'FEATURE_TABLE')}`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) { status(`<span class="err">${esc(e.message)}</span>`, 'none'); }
+  b.disabled = false; b.textContent = label;
+});
+
+// ---------- recent jobs ----------
+function remember(jobId, name) {
+  const list = store.get('recent', []).filter(x => x.job_id !== jobId);
+  list.unshift({ job_id: jobId, name, at: new Date().toISOString() });
+  store.set('recent', list.slice(0, 10));
+  renderRecent();
+}
+function renderRecent() {
+  const list = store.get('recent', []);
+  $('#recentCard').hidden = !list.length;
+  $('#recent').innerHTML = list.map(x => `<li><a data-job="${esc(x.job_id)}">${esc(x.name)}</a> <span class="muted">· ${new Date(x.at).toLocaleString()}</span></li>`).join('');
+  document.querySelectorAll('#recent a').forEach(a => a.onclick = () => openJob(a.dataset.job, a.textContent));
+}
+async function openJob(jobId, name) {
+  status(`Loading <b>${esc(name)}</b>…`, 'busy');
+  try {
+    const r = await fetch(`/jobs/${jobId}`, { headers: { 'X-API-Key': keyEl.value.trim() } });
+    if (!r.ok) throw new Error(r.status === 404 ? 'That job no longer exists on the server.' : r.status === 401 ? 'The API key was rejected.' : `Error ${r.status}`);
+    const body = await r.json();
+    status(`Showing <b>${esc(name)}</b>.`, 'none');
+    show(body);
+  } catch (e) { status(`<span class="err">${esc(e.message)}</span>`, 'none'); }
+}
+renderRecent();
+</script>
+</body>
+</html>

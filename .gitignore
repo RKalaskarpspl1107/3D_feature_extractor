@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+jobs/
+output/
+*.stp
+*.step
+*.STP
+*.STEP
+.env
+db_config*.json
